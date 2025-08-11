@@ -1,0 +1,19 @@
+{
+  "name": "WLED Usermod TM1637 4-Digit Display",
+  "version": "1.4.0",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Your Name"
+    }
+  ],
+  "frameworks": [
+    "arduino"
+  ],
+  "platforms": [
+    "*"
+  ],
+  "build": {
+    "libArchive": false
+  }
+}
