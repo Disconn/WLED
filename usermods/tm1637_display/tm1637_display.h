@@ -42,6 +42,8 @@ public:
   bool    time24h               = true;
   bool    timeLeadingZero       = true;
   bool    colonBlinkSeconds     = true;  // im Zeitmodus: Sekundentakt statt Puls
+  bool    showIP                = true;
+  
 
   // Freitext für Modus=Text (4 Zeichen; ':' wird ignoriert)
   String  content               = "0123"; 
@@ -57,6 +59,7 @@ public:
   bool handleUsermod(JsonObject umData);
   void addToConfig(JsonObject &root) override;
   bool readFromConfig(JsonObject &root) override;
+  bool getLocalIP(int ipOut[4]) const;
   uint16_t getId() override { return 0x12A7; }
 
   void setContent(const String &s);

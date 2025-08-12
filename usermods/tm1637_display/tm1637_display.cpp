@@ -82,10 +82,6 @@ void UsermodTM1637::addToJsonInfo(JsonObject& root){
   me[F("time24h")]   = time24h;
   me[F("lead0")]     = timeLeadingZero;
   me[F("content")]   = content;
-  // Zeitstatus
-  time_t __ts = time(nullptr);
-  bool __time_valid = (__ts != (time_t)-1 && __ts >= 60);
-  me["time_valid"] = __time_valid;
 }
 
 bool UsermodTM1637::handleUsermod(JsonObject umData){
@@ -137,6 +133,35 @@ void UsermodTM1637::addToConfig(JsonObject &root){
   // Doppelpunkt
   top[F("show_colon")] = showColon;
   top[F("colon_blink_seconds")] = colonBlinkSeconds;
+
+  top[F("show_ip")] = showIP;
+}
+
+bool UsermodTM1637::getLocalIP(int ipOut[4]) const {
+  IPAddress ip(0,0,0,0);
+
+#if defined(ARDUINO_ARCH_ESP32)
+
+  if (WiFi.isConnected()) {
+    ip = WiFi.localIP();
+  }
+
+  if ((ip[0] | ip[1] | ip[2] | ip[3]) == 0 && ETH.linkUp()) {
+    IPAddress ethIp = ETH.localIP();
+    if ((ethIp[0] | ethIp[1] | ethIp[2] | ethIp[3]) != 0) {
+      ip = ethIp;
+    }
+  }
+#else
+
+#endif
+
+  ipOut[0] = ip[0];
+  ipOut[1] = ip[1];
+  ipOut[2] = ip[2];
+  ipOut[3] = ip[3];
+
+  return (ip[0] | ip[1] | ip[2] | ip[3]) != 0;
 }
 
 bool UsermodTM1637::readFromConfig(JsonObject &root){
@@ -158,6 +183,7 @@ bool UsermodTM1637::readFromConfig(JsonObject &root){
   followWledBrightness  = top[F("follow_wled_brightness")] | followWledBrightness;
 
   showColon             = top[F("show_colon")] | showColon;
+  showIP                = top[F("show_ip")] | showIP;
 
   // Re‑init
   _bus = TM1637Bus(pinCLK, pinDIO);
@@ -169,7 +195,7 @@ bool UsermodTM1637::readFromConfig(JsonObject &root){
   return true;
 }
 
-// --- intern ---
+
 void UsermodTM1637::applyBrightness(){
   _appliedBrightness = constrain(brightness, 0, 7);
   _bus.setBrightness(_appliedBrightness, true);
@@ -185,8 +211,29 @@ uint8_t UsermodTM1637::mapChar(char c){
 }
 
 void UsermodTM1637::renderText(){
-  int h=0,m=0,s=0; 
-  h = hour(localTime); m = minute(localTime); s = second(localTime);
+  int s=0; 
+  s = second(localTime);
+
+  if(showIP) {
+    int s1 = s % 10;
+    int ip[4] = {0,0,0,0};
+    bool ok = getLocalIP(ip);
+    if(s1 == 0 || s1 == 1) {
+      content = ip[0];
+    }
+    if(s1 == 2 || s1 == 3) {
+      content = ip[1];
+    }
+    if(s1 == 4 || s1 == 5) {
+      content = ip[2];
+    }
+    if(s1 == 6 || s1 == 7) {
+      content = ip[3];
+    }
+    if(s1 == 8 || s1 == 9) {
+      content = "    ";
+    }
+  }
 
   uint8_t seg[4]={0,0,0,0};
   char buf[5]={0,0,0,0,0};
@@ -197,9 +244,9 @@ void UsermodTM1637::renderText(){
   if (_colonRenderState) seg[1] |= 0x80;
   _bus.setSegments(seg,4,0);
 
-    // Doppelpunkt: Sekundentakt
+
   if (colonBlinkSeconds && showColon){
-    _colonRenderState = (s % 2 == 0); // an in geraden Sekunden
+    _colonRenderState = (s % 2 == 0);
   } else {
     if(showColon){
       _colonRenderState = 1;
@@ -221,12 +268,10 @@ void UsermodTM1637::renderTime(){
   if (timeLeadingZero || hh>=10) snprintf(out,sizeof(out),"%02d%02d",hh,m);
   else snprintf(out,sizeof(out)," %1d%02d",hh,m);
 
-  // Content aktualisieren
   content = String(out);
 
-  // Doppelpunkt: Sekundentakt
   if (colonBlinkSeconds && showColon){
-    _colonRenderState = (s % 2 == 0); // an in geraden Sekunden
+    _colonRenderState = (s % 2 == 0); 
   }
 
   renderText();
