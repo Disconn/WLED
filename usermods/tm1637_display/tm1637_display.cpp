@@ -1,8 +1,7 @@
 #include "tm1637_display.h"
 #include <math.h>   // cosf,fmodf
-#include <time.h>   // time(), localtime_r, getLocalTime (ESP32)
+#include <time.h>   
 #ifdef ARDUINO_ARCH_ESP32
-#include <WiFi.h>
 #endif
 
 // LUT
@@ -65,7 +64,6 @@ void UsermodTM1637::loop(){
   unsigned long nowMs = millis();
   if (nowMs - _lastUpdate >= 25){
     _lastUpdate = nowMs;
-    updateColon(nowMs);
     if (showTime) renderTime(); else renderText();
   }
 }
@@ -80,7 +78,6 @@ void UsermodTM1637::addToJsonInfo(JsonObject& root){
   me[F("gpio_dio")]  = pinDIO;
   me[F("brightness")] = brightness;
   me[F("colon")]     = showColon;
-  me[F("colonPulse")] = colonPulse;
   me[F("mode")]      = showTime ? F("time") : F("text");
   me[F("time24h")]   = time24h;
   me[F("lead0")]     = timeLeadingZero;
@@ -108,13 +105,12 @@ bool UsermodTM1637::handleUsermod(JsonObject umData){
   if (o.containsKey(F("timeLeadingZero"))) { timeLeadingZero = o[F("timeLeadingZero")]; changed = true; }
 
   if (o.containsKey(F("colon"))) { showColon = o[F("colon")]; changed = true; }
-  if (o.containsKey(F("colonPulse"))) { colonPulse = o[F("colonPulse")]; changed = true; }
   if (o.containsKey(F("brightness"))) { brightness = constrain((int)o[F("brightness")],0,7); applyBrightness(); changed = true; }
 
   return changed;
 }
 
-// Web‑UI (stabil: nur "~" Beschreibungen)
+// Web‑UI
 void UsermodTM1637::addToConfig(JsonObject &root){
   JsonObject top = root.createNestedObject(F("tm1637_display"));
 
@@ -130,24 +126,17 @@ void UsermodTM1637::addToConfig(JsonObject &root){
   top[F("time_24h")] = time24h;
   top[F("time_leading_zero")]  = timeLeadingZero;
 
-  // Anzeigeverhalten
-  top[F("blank_until_time_valid")] = blankUntilTimeValid;
-  top[F("colon_blink_seconds")] = colonBlinkSeconds;
-
   // Pins
-  top[F("gpio_clk__gpio")] = pinCLK;
-  top[F("gpio_dio__gpio")] = pinDIO;
+  top[F("gpio_clk")] = pinCLK;
+  top[F("gpio_dio")] = pinDIO;
 
   // Helligkeit
-  top[F("brightness__level")] = brightness;
+  top[F("brightness_level")] = brightness;
   top[F("follow_wled_brightness")] = followWledBrightness;
 
   // Doppelpunkt
   top[F("show_colon")] = showColon;
-  top[F("colon_pulse")] = colonPulse;
-  top[F("colon_pulse_period_ms__ms")] = colonPulsePeriodMs;
-  top[F("colon_duty_min_pct__pct")] = colonDutyMinPct;
-  top[F("colon_duty_max_pct__pct")] = colonDutyMaxPct;
+  top[F("colon_blink_seconds")] = colonBlinkSeconds;
 }
 
 bool UsermodTM1637::readFromConfig(JsonObject &root){
@@ -161,19 +150,14 @@ bool UsermodTM1637::readFromConfig(JsonObject &root){
   time24h               = top[F("time_24h")] | time24h;
   timeLeadingZero       = top[F("time_leading_zero")] | timeLeadingZero;
 
-  pinCLK                = top[F("gpio_clk__gpio")] | pinCLK;
-  blankUntilTimeValid   = top[F("blank_until_time_valid")] | blankUntilTimeValid;
+  pinCLK                = top[F("gpio_clk")] | pinCLK;
   colonBlinkSeconds     = top[F("colon_blink_seconds")] | colonBlinkSeconds;
-  pinDIO                = top[F("gpio_dio__gpio")] | pinDIO;
+  pinDIO                = top[F("gpio_dio")] | pinDIO;
 
-  brightness            = constrain((int)(top[F("brightness__level")] | brightness), 0, 7);
+  brightness            = constrain((int)(top[F("brightness_level")] | brightness), 0, 7);
   followWledBrightness  = top[F("follow_wled_brightness")] | followWledBrightness;
 
   showColon             = top[F("show_colon")] | showColon;
-  colonPulse            = top[F("colon_pulse")] | colonPulse;
-  colonPulsePeriodMs    = top[F("colon_pulse_period_ms")] | colonPulsePeriodMs;
-  colonDutyMinPct       = constrain((int)(top[F("colon_duty_min")] | colonDutyMinPct), 0, 100);
-  colonDutyMaxPct       = constrain((int)(top[F("colon_duty_max")] | colonDutyMaxPct), 0, 100);
 
   // Re‑init
   _bus = TM1637Bus(pinCLK, pinDIO);
@@ -200,22 +184,10 @@ uint8_t UsermodTM1637::mapChar(char c){
   return 0x00;
 }
 
-void UsermodTM1637::updateColon(unsigned long nowMs){
-  if (!showColon){ _colonRenderState=false; return; }
-  if (!colonPulse || colonPulsePeriodMs < 50){ _colonRenderState=true; return; }
-
-  float phase = fmodf((float)(nowMs % colonPulsePeriodMs), (float)colonPulsePeriodMs) / (float)colonPulsePeriodMs;
-  float y = 0.5f - 0.5f * cosf(phase * 2.0f * (float)PI); // weich
-
-  uint8_t dmin = colonDutyMinPct, dmax = colonDutyMaxPct;
-  if (dmin > dmax){ uint8_t t=dmin; dmin=dmax; dmax=t; }
-  float duty = dmin + (dmax - dmin) * y;
-
-  const uint16_t sub = 200;
-  _colonRenderState = ((nowMs % sub) < (uint16_t)(sub * (duty/100.0f)));
-}
-
 void UsermodTM1637::renderText(){
+  int h=0,m=0,s=0; 
+  h = hour(localTime); m = minute(localTime); s = second(localTime);
+
   uint8_t seg[4]={0,0,0,0};
   char buf[5]={0,0,0,0,0};
   uint8_t idx=0;
@@ -224,17 +196,23 @@ void UsermodTM1637::renderText(){
   for(uint8_t i=0;i<4;i++) seg[i]=mapChar(buf[i]);
   if (_colonRenderState) seg[1] |= 0x80;
   _bus.setSegments(seg,4,0);
+
+    // Doppelpunkt: Sekundentakt
+  if (colonBlinkSeconds && showColon){
+    _colonRenderState = (s % 2 == 0); // an in geraden Sekunden
+  } else {
+    if(showColon){
+      _colonRenderState = 1;
+    } else {
+      _colonRenderState = 0;
+    }
+  }
 }
 
 void UsermodTM1637::renderTime(){
-  int h=0,m=0,s=0; bool valid=false; readClock(h,m,s,valid);
+  int h=0,m=0,s=0;
 
-  if (blankUntilTimeValid && !valid){
-    // leer anzeigen
-    uint8_t seg[4]={0,0,0,0};
-    _bus.setSegments(seg,4,0);
-    return;
-  }
+  h = hour(localTime); m = minute(localTime); s = second(localTime);
 
   int hh=h;
   if (!time24h){ hh = hh%12; if(hh==0) hh=12; }
@@ -246,20 +224,13 @@ void UsermodTM1637::renderTime(){
   // Content aktualisieren
   content = String(out);
 
-  // Doppelpunkt: entweder Sekundentakt oder Puls
-  if (colonBlinkSeconds && valid && showColon){
+  // Doppelpunkt: Sekundentakt
+  if (colonBlinkSeconds && showColon){
     _colonRenderState = (s % 2 == 0); // an in geraden Sekunden
   }
 
   renderText();
 }
 
-void UsermodTM1637::readClock(int &h, int &m, int &s, bool &valid){
-  valid = false;
-
-  h = hour(localTime); m = minute(localTime); s = second(localTime); valid = true; DEBUG_PRINTLN(F("getLocalTime used"));
-
-}
-
-static UsermodTM1637 temperature2;
-REGISTER_USERMOD(temperature2);
+static UsermodTM1637 usermodtm1637;
+REGISTER_USERMOD(usermodtm1637);

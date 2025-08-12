@@ -1,17 +1,11 @@
 #pragma once
 // ============================================================================
-//  TM1637 4‑Digit Display Usermod für WLED (v2 API)
-//  Stabil & UI‑freundlich:
-//   - Text ODER Uhrzeit (HH:MM) per Bool (show_time)
-//   - Pulsierender Doppelpunkt (show_colon/colon_pulse/period/duty)
-//   - GPIOs & Helligkeit (0–7), optional an WLED‑Brightness koppeln
-//   - Web‑UI Beschreibungen via "~"
-//   - Saubere Trennung: Header (.h) + Implementierung (.cpp)
+//  TM1637 4‑Digit Display Usermod for WLED
+//  
 // ============================================================================
 
 #include "wled.h"
 
-// 7‑Segment LUT (a..g,dp); DP ungenutzt, Doppelpunkt eigenes Bit an Digit1
 extern const uint8_t SEGMENTS_LUT[16];
 
 // --- Low‑Level TM1637 Bus ---
@@ -42,22 +36,15 @@ public:
   uint8_t brightness            = 3;      // 0..7
   bool    followWledBrightness  = false;
   bool    showColon             = true;
-  bool    colonPulse            = false;
-  uint16_t colonPulsePeriodMs   = 1500;
-  uint8_t  colonDutyMinPct      = 10;
-  uint8_t  colonDutyMaxPct      = 90;
 
   // Zeit-Anzeige Optionen
   bool    showTime              = false;  // false=text, true=time
   bool    time24h               = true;
   bool    timeLeadingZero       = true;
-  bool    blankUntilTimeValid   = false;  // Display bleibt leer bis NTP-Zeit gültig
   bool    colonBlinkSeconds     = true;  // im Zeitmodus: Sekundentakt statt Puls
 
   // Freitext für Modus=Text (4 Zeichen; ':' wird ignoriert)
-  String  content               = "0123"; // 4 Zeichen, ':' ignoriert
-
-   // 4 Zeichen, ':' ignoriert
+  String  content               = "0123"; 
 
   UsermodTM1637();
 
@@ -85,6 +72,6 @@ private:
   void updateColon(unsigned long nowMs);
   void renderText();
   void renderTime();
-  void readClock(int &h, int &m, int &s, bool &valid);
+  void readClock(int &h, int &m, int &s);
   void initTimeIfNeeded();
 };
