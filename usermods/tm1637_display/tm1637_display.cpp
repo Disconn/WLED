@@ -45,7 +45,6 @@ void UsermodTM1637::setup(){
   _bus = TM1637Bus(pinCLK,pinDIO);
   _bus.begin();
   applyBrightness();
-  initTimeIfNeeded(); // sicherstellen, dass SNTP läuft (falls gewünscht)
   _lastUpdate = millis();
   if (showTime) renderTime(); else renderText();
 }
@@ -58,6 +57,9 @@ void UsermodTM1637::loop(){
   if (followWledBrightness){
     uint8_t mapped = map((uint16_t)bri, 0, 255, 0, 7);
     if (mapped != _appliedBrightness){ brightness = mapped; applyBrightness(); }
+  } else {
+    uint8_t mapped = map((uint16_t)brightness, 0, 255, 0, 7);
+    if (mapped != _appliedBrightness){ applyBrightness(); }
   }
 
   unsigned long nowMs = millis();
@@ -116,72 +118,62 @@ bool UsermodTM1637::handleUsermod(JsonObject umData){
 void UsermodTM1637::addToConfig(JsonObject &root){
   JsonObject top = root.createNestedObject(F("tm1637_display"));
 
-  top[F("enabled__bool")]   = enabled;
+  top[F("enabled")] = enabled;
 
   // Modus
-  top[F("show_time__bool")]  = showTime;
+  top[F("show_time")] = showTime;
 
   // Text (nur wenn show_time=0 genutzt)
-  top[F("content__text")]   = content;
+  top[F("content")] = content;
 
   // Zeitformat
-  top[F("time_24h__bool")]   = time24h;
-  top[F("time_leading_zero__bool")]  = timeLeadingZero;
+  top[F("time_24h")] = time24h;
+  top[F("time_leading_zero")]  = timeLeadingZero;
 
   // Anzeigeverhalten
-  top[F("blank_until_time_valid__bool")] = blankUntilTimeValid;
-  top[F("colon_blink_seconds__bool")] = colonBlinkSeconds;
-
-  // Optionale SNTP-Initialisierung (nur wenn Zeit ungültig)
-  top[F("force_time_init__bool")] = forceTimeInit;
-  top[F("tz_string__text")] = tzString;
-  top[F("ntp_server1__text")] = ntpServer1;
-  top[F("ntp_server2__text")] = ntpServer2;
+  top[F("blank_until_time_valid")] = blankUntilTimeValid;
+  top[F("colon_blink_seconds")] = colonBlinkSeconds;
 
   // Pins
-  top[F("gpio_clk__gpio")]  = pinCLK;
-  top[F("gpio_dio__gpio")]  = pinDIO;
+  top[F("gpio_clk__gpio")] = pinCLK;
+  top[F("gpio_dio__gpio")] = pinDIO;
 
   // Helligkeit
-  top[F("brightness__level")]  = brightness;
-  top[F("follow_wled_brightness__bool")]  = followWledBrightness;
+  top[F("brightness__level")] = brightness;
+  top[F("follow_wled_brightness")] = followWledBrightness;
 
   // Doppelpunkt
-  top[F("show_colon__bool")]   = showColon;
-  top[F("colon_pulse__bool")]  = colonPulse;
-  top[F("colon_pulse_period_ms__ms")]   = colonPulsePeriodMs;
-  top[F("colon_duty_min_pct__pct")]     = colonDutyMinPct;
-  top[F("colon_duty_max_pct__pct")]     = colonDutyMaxPct;
+  top[F("show_colon")] = showColon;
+  top[F("colon_pulse")] = colonPulse;
+  top[F("colon_pulse_period_ms__ms")] = colonPulsePeriodMs;
+  top[F("colon_duty_min_pct__pct")] = colonDutyMinPct;
+  top[F("colon_duty_max_pct__pct")] = colonDutyMaxPct;
 }
 
 bool UsermodTM1637::readFromConfig(JsonObject &root){
   JsonObject top = root[F("tm1637_display")];
   if (top.isNull()) return false;
 
-  enabled               = top[F("enabled__bool")] | enabled;
-  showTime              = top[F("show_time__bool")] | showTime;
-  if (top.containsKey(F("content__text"))) content = top[F("content__text")] | content;
+  enabled               = top[F("enabled")] | enabled;
+  showTime              = top[F("show_time")] | showTime;
+  if (top.containsKey(F("content"))) content = top[F("content")] | content;
 
-  time24h               = top[F("time_24h__bool")] | time24h;
-  timeLeadingZero       = top[F("time_leading_zero__bool")] | timeLeadingZero;
+  time24h               = top[F("time_24h")] | time24h;
+  timeLeadingZero       = top[F("time_leading_zero")] | timeLeadingZero;
 
   pinCLK                = top[F("gpio_clk__gpio")] | pinCLK;
-  blankUntilTimeValid   = top[F("blank_until_time_valid__bool")] | blankUntilTimeValid;
-  colonBlinkSeconds     = top[F("colon_blink_seconds__bool")] | colonBlinkSeconds;
-  forceTimeInit         = top[F("force_time_init__bool")] | forceTimeInit;
-  if (top.containsKey(F("tz_string__text"))) tzString = top[F("tz_string__text")] | tzString;
-  if (top.containsKey(F("ntp_server1__text"))) ntpServer1 = top[F("ntp_server1__text")] | ntpServer1;
-  if (top.containsKey(F("ntp_server2__text"))) ntpServer2 = top[F("ntp_server2__text")] | ntpServer2;
+  blankUntilTimeValid   = top[F("blank_until_time_valid")] | blankUntilTimeValid;
+  colonBlinkSeconds     = top[F("colon_blink_seconds")] | colonBlinkSeconds;
   pinDIO                = top[F("gpio_dio__gpio")] | pinDIO;
 
   brightness            = constrain((int)(top[F("brightness__level")] | brightness), 0, 7);
-  followWledBrightness  = top[F("follow_wled_brightness__bool")] | followWledBrightness;
+  followWledBrightness  = top[F("follow_wled_brightness")] | followWledBrightness;
 
-  showColon             = top[F("show_colon__bool")] | showColon;
-  colonPulse            = top[F("colon_pulse__bool")] | colonPulse;
-  colonPulsePeriodMs    = top[F("colon_pulse_period_ms__ms")] | colonPulsePeriodMs;
-  colonDutyMinPct       = constrain((int)(top[F("colon_duty_min_pct__pct")] | colonDutyMinPct), 0, 100);
-  colonDutyMaxPct       = constrain((int)(top[F("colon_duty_max_pct__pct")] | colonDutyMaxPct), 0, 100);
+  showColon             = top[F("show_colon")] | showColon;
+  colonPulse            = top[F("colon_pulse")] | colonPulse;
+  colonPulsePeriodMs    = top[F("colon_pulse_period_ms")] | colonPulsePeriodMs;
+  colonDutyMinPct       = constrain((int)(top[F("colon_duty_min")] | colonDutyMinPct), 0, 100);
+  colonDutyMaxPct       = constrain((int)(top[F("colon_duty_max")] | colonDutyMaxPct), 0, 100);
 
   // Re‑init
   _bus = TM1637Bus(pinCLK, pinDIO);
@@ -267,29 +259,6 @@ void UsermodTM1637::readClock(int &h, int &m, int &s, bool &valid){
 
   h = hour(localTime); m = minute(localTime); s = second(localTime); valid = true; DEBUG_PRINTLN(F("getLocalTime used"));
 
-}
-
-
-void UsermodTM1637::initTimeIfNeeded(){
-  // Wenn gültige Zeit vorhanden → nichts tun
-  time_t ts = time(nullptr);
-  if (ts != (time_t)-1 && ts >= 60) return;
-  if (!forceTimeInit) return;
-
-  // Default-Server & TZ, falls leer
-  String tz = tzString.length() ? tzString : String("UTC0");
-  String s1 = ntpServer1.length() ? ntpServer1 : String("pool.ntp.org");
-  String s2 = ntpServer2.length() ? ntpServer2 : String("time.nist.gov");
-
-  #ifdef ARDUINO_ARCH_ESP32
-    // ESP32: TZ-String setzen und NTP starten
-    setenv("TZ", tz.c_str(), 1);
-    tzset();
-    configTzTime(tz.c_str(), s1.c_str(), s2.c_str());
-  #else
-    // ESP8266: offset/ DST hier 0; TZ-Umsetzung via tzset() existiert nicht analog
-    configTime(0, 0, s1.c_str(), s2.c_str());
-  #endif
 }
 
 static UsermodTM1637 temperature2;

@@ -2,7 +2,7 @@
 // ============================================================================
 //  TM1637 4‑Digit Display Usermod für WLED (v2 API)
 //  Stabil & UI‑freundlich:
-//   - Text ODER Uhrzeit (HH:MM) per Bool (show_time__bool)
+//   - Text ODER Uhrzeit (HH:MM) per Bool (show_time)
 //   - Pulsierender Doppelpunkt (show_colon/colon_pulse/period/duty)
 //   - GPIOs & Helligkeit (0–7), optional an WLED‑Brightness koppeln
 //   - Web‑UI Beschreibungen via "~"
@@ -37,12 +37,12 @@ class UsermodTM1637 : public Usermod {
 public:
   // Konfigurierbar
   bool    enabled               = true;
-  uint8_t pinCLK                = 18;
-  uint8_t pinDIO                = 19;
+  int8_t pinCLK                = 18;
+  int8_t pinDIO                = 19;
   uint8_t brightness            = 3;      // 0..7
   bool    followWledBrightness  = false;
   bool    showColon             = true;
-  bool    colonPulse            = true;
+  bool    colonPulse            = false;
   uint16_t colonPulsePeriodMs   = 1500;
   uint8_t  colonDutyMinPct      = 10;
   uint8_t  colonDutyMaxPct      = 90;
@@ -52,16 +52,10 @@ public:
   bool    time24h               = true;
   bool    timeLeadingZero       = true;
   bool    blankUntilTimeValid   = false;  // Display bleibt leer bis NTP-Zeit gültig
-  bool    colonBlinkSeconds     = false;  // im Zeitmodus: Sekundentakt statt Puls
-
-  // Optionale SNTP-Initialisierung (nur wenn WLED keine Zeit liefert)
-  bool    forceTimeInit         = false;  // bei Zeit=ungültig selbst SNTP starten
-  String  tzString              = "";     // z.B. "CET-1CEST,M3.5.0/2,M10.5.0/3"
-  String  ntpServer1            = "";     // z.B. "pool.ntp.org"
-  String  ntpServer2            = "";     // optional zweiter Server
+  bool    colonBlinkSeconds     = true;  // im Zeitmodus: Sekundentakt statt Puls
 
   // Freitext für Modus=Text (4 Zeichen; ':' wird ignoriert)
-  String  content               = "-- --"; // 4 Zeichen, ':' ignoriert
+  String  content               = "0123"; // 4 Zeichen, ':' ignoriert
 
    // 4 Zeichen, ':' ignoriert
 
